@@ -1,3 +1,4 @@
+#pragma once
 #include <numeric>
 #include <math.h>
 #define ALIGN(x) __attribute__( ( aligned(x) ))
@@ -38,4 +39,20 @@ inline float dot(const float3& a, const float3& b) {
 inline float3 normalize(const float3 a) {
   float3 invLen = 1 / sqrtf(dot(a,a));
   return a * invLen;
+}
+
+inline float3 fminf(const float3& a, const float3& b) {
+  return float3(
+    fminf(a.x, b.x),
+    fminf(a.y, b.y),
+    fminf(a.z, b.z)
+  );
+}
+
+inline float3 fmaxf(const float3& a, const float3& b) {
+  return float3(
+    fmaxf(a.x, b.x),
+    fmaxf(a.y, b.y),
+    fmaxf(a.z, b.z)
+  );
 }

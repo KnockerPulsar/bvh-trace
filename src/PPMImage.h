@@ -1,3 +1,4 @@
+#include "vec_math.h"
 #include <vector>
 #include <string>
 #include <iostream>
@@ -117,5 +118,12 @@ public:
     pixels[pixelIndex + 0] = value;
     pixels[pixelIndex + 1] = value;
     pixels[pixelIndex + 2] = value;
+  }
+
+  void writeToPixel(int x, int y, float3 color) {
+    int pixelIndex = (x + y * width) * 3;
+    pixels[pixelIndex + 0] = color.x;
+    pixels[pixelIndex + 1] = color.y;
+    pixels[pixelIndex + 2] = color.z;
   }
 };
