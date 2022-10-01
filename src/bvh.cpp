@@ -1,12 +1,16 @@
 #include "bvh.h"
 #include "aabb.h"
+#include "bin.h"
 #include "bvh_node.h"
+#include "tri.h"
+#include <algorithm>
 #include <chrono>
 #include <numeric>
 #include <stdio.h>
 
 #define EVALUATE_SAH 1
 #define SAH_TEST_PLANES 4
+#define BINS 20
 
 Tri tri[N];
 uint triIdx[N];
@@ -53,19 +57,52 @@ float EvaluateSAH( BVHNode& node, int axis, float pos) {
 
 float FindBestSplitPlane(BVHNode& node, int& axis, float& splitPos) {
   float bestCost = 1e30f;
-
   for( int a = 0; a < 3; a++) {
-    float boundsMin = node.aabbMin[a];
-    float boundsMax = node.aabbMax[a];
+
+    float boundsMin = 1e30f, boundsMax = -1e30f; 
+    for (int i = 0; i < node.triCount; i++) {
+      Tri& triangle = tri[triIdx[ node.firstTriIndex + i ]];
+      boundsMin = fminf(boundsMin, triangle.centroid[a]);
+      boundsMax = fmaxf(boundsMax, triangle.centroid[a]);
+    }
 
     if(boundsMin == boundsMax) continue;
-    float scale = (boundsMax - boundsMin) / SAH_TEST_PLANES;
 
-    for( uint i = 1; i < SAH_TEST_PLANES; i++) {
-      float candidatePos = boundsMin + i * scale;
-      float cost = EvaluateSAH(node, a, candidatePos);
-      if(cost < bestCost)
-        splitPos = candidatePos, axis = a, bestCost = cost;
+    Bin bin[BINS];
+    float scale = BINS / (boundsMax - boundsMin);
+
+    for (uint i = 0; i < node.triCount; i++) {
+      Tri& triangle = tri[triIdx[node.firstTriIndex + i]];
+
+      int binIdx = std::min(BINS-1, (int)((triangle.centroid[a] - boundsMin) * scale)); 
+      bin[binIdx].triCount++;
+      bin[binIdx].bounds.grow(triangle.vertex0);
+      bin[binIdx].bounds.grow(triangle.vertex1);
+      bin[binIdx].bounds.grow(triangle.vertex2);
+    }
+
+    float leftArea[BINS-1], rightArea[BINS-1];
+    int leftCount[BINS-1], rightCount[BINS-1];
+
+    AABB leftBox, rightBox;
+    int leftSum = 0, rightSum = 0;
+    for (int i = 0; i < BINS - 1; i++) {
+      leftSum += bin[i].triCount;
+      leftCount[i] = leftSum;
+      leftBox.grow(bin[i].bounds);
+      leftArea[i] = leftBox.area();
+
+      rightSum += bin[BINS - 1 - i].triCount;
+      rightCount[BINS - 2 -i] = rightSum;
+      rightBox.grow(bin[BINS - 1 - i].bounds);
+      rightArea[BINS - 2 - i] = rightBox.area();
+    }
+
+    scale = (boundsMax - boundsMin) / BINS;
+    for( uint i = 1; i < BINS - 1; i++) {
+      float planeCost = leftCount[i] * leftArea[i] + rightCount[i] * rightArea[i];
+      if(planeCost < bestCost)
+        splitPos = boundsMin + scale * (i+1), axis = a, bestCost = planeCost;
     }
   }
 
