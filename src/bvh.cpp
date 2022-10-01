@@ -4,7 +4,7 @@
 #include <numeric>
 #include <stdio.h>
 
-#define EVALUATE_SAH 1
+#define EVALUATE_SAH 0
 
 Tri tri[N];
 uint triIdx[N];

@@ -82,7 +82,7 @@ void IntersectTri(Ray& ray, const Tri& tri) {
 
 }
 
-bool IntersectAABB(  Ray& ray, const float3 bmin, const float3 bmax ) {
+float IntersectAABB(  Ray& ray, const float3 bmin, const float3 bmax ) {
   float tx1 = (bmin.x - ray.O.x) / ray.D.x; float tx2 = (bmax.x - ray.O.x) / ray.D.x;
 
   float tmin = fmin(tx1, tx2), tmax = fmax(tx1, tx2);
@@ -97,21 +97,40 @@ bool IntersectAABB(  Ray& ray, const float3 bmin, const float3 bmax ) {
 
   tmin = fmax(tmin, fmin(tz1, tz2)), tmax = fmin(tmax, fmax(tz1, tz2));
   bool hit = tmax >= tmin && tmin < ray.t && tmax > 0;
-  return hit;
+  return hit? tmin : 1e30f;
 }
 
 void IntersectBVH(Ray& ray, const uint nodeIndex) {
-  BVHNode& node = bvhNode[nodeIndex];
+  BVHNode* node = &bvhNode[nodeIndex];
+  BVHNode* stack[64];
+  uint stackPtr = 0;
 
-  if(!IntersectAABB(ray, node.aabbMin, node.aabbMax)) return;
+  while(1) {
+    if(node->isLeaf()) {
+      for (uint i = 0; i < node->triCount; i++) {
+        IntersectTri(ray, tri[triIdx[node->firstTriIndex + i]]);
+      }
 
-  if(node.isLeaf()) {
-    for (uint i = 0; i < node.triCount; i++) {
-      IntersectTri(ray, tri[triIdx[node.firstTriIndex + i]]);
+      if(stackPtr == 0) break;
+      else              node = stack[--stackPtr];
+
+      continue;
     }
-  } else {
-    IntersectBVH(ray, node.leftNode);
-    IntersectBVH(ray, node.leftNode+1);
+
+    BVHNode* child1 = &bvhNode[node->leftNode];
+    BVHNode* child2 = &bvhNode[node->leftNode + 1];
+
+    float dist1 = IntersectAABB(ray, child1->aabbMin, child1->aabbMax);
+    float dist2 = IntersectAABB(ray, child2->aabbMin, child2->aabbMax);
+
+    if(dist1 > dist2) {std::swap(dist1, dist2); std::swap(child1, child2); }
+    if(dist1 == 1e30f) {
+      if(stackPtr == 0) break;
+      else              node = stack[--stackPtr];
+    } else {
+      node = child1;
+      if(dist2 != 1e30f) stack[stackPtr++] = child2;
+    }
   }
 }
 
@@ -126,11 +145,6 @@ int main() {
   Ray ray;
   ray.O = float3(-1.5f, -0.2f, -2.5f);
 
-  float3 offset = normalize((p0 + p1 + p2) * 0.333f - ray.O);
-  offset = offset * 0.0f;
-
-  ray.O = ray.O + offset;
-  
   auto start = std::chrono::high_resolution_clock::now();
   for ( int y = 0; y < RES_Y; y++) {
     // printf("%.2f\r", ((float)y+1)/RES_Y * 100.0f);
