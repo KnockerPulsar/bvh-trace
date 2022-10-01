@@ -145,11 +145,12 @@ int main() {
   Ray ray;
   ray.O = float3(-1.5f, -0.2f, -2.5f);
 
+  const int tile_size = 8;
+
   auto start = std::chrono::high_resolution_clock::now();
-  for ( int y = 0; y < RES_Y; y++) {
-    // printf("%.2f\r", ((float)y+1)/RES_Y * 100.0f);
-    // std::flush(std::cout);
-    for ( int x = 0; x < RES_X; x++ ) {
+  for ( int y = 0; y < RES_Y; y += tile_size) for ( int x = 0; x < RES_X; x += tile_size ) {
+    for (int u = 0; u < tile_size; u++) for (int v = 0; v < tile_size ; v++ ) {
+
       /*
                    |
              p0    |     p1
@@ -161,24 +162,19 @@ int main() {
 
          This enables us to get canvas positions in the square formed by
          p0, p1, p2.
-     */
+      */
 
-      float3 pixelPos = ray.O + p0 + (p1-p0) * (x/RES_X) + (p2-p0) * (y/RES_Y);
+      float3 pixelPos = ray.O + p0 + (p1-p0) * ((x+u)/RES_X) + (p2-p0) * ((y+v)/RES_Y);
       ray.D = normalize(pixelPos - ray.O);
       ray.rD = float3(1/ray.D.x , 1/ray.D.y, 1/ray.D.z); 
       ray.t = 1e30f;
 
-#if 0
-      for ( int i = 0; i < N; i++) 
-        IntersectTri(ray, tri[i]);
-#else 
       IntersectBVH(ray, rootNodeIdx);
-#endif
 
       uint c = (255 - ray.t * 75);
 
       if(ray.t < 1e30f) {
-        output.writeToPixel(x, y, float3(c));      
+        output.writeToPixel(x + u, y + v, float3(c));      
       }
     }
   }
