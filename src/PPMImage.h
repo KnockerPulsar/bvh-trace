@@ -74,6 +74,20 @@ public:
     return result;
   }
 
+  static Image fromColor(int width, int height, float3 color) {
+    Image result;
+    result.width = width;
+    result.height = height;
+
+    for (int i = 0; i < width*height; i++) {
+      result.pixels.push_back((char)color.x);
+      result.pixels.push_back((char)color.y);
+      result.pixels.push_back((char)color.z);
+    }
+
+    return result;
+  }
+
   void save(std::string path) {
     std::ofstream out(path, std::ios::binary);
 

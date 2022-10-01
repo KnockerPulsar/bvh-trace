@@ -1,6 +1,8 @@
 .cache/
 CMakeCache.txt
+build/
 CMakeFiles/
 Makefile
 cmake_install.cmake
 compile_commands.json
+bvh-trace

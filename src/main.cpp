@@ -8,19 +8,36 @@
 #include <cstdio>
 #include <cstdlib>
 #include <math.h>
+#include <ostream>
 #include <type_traits>
+#include <chrono>
 
-#define N 12
+#define N 12582
+#define RES_X 640.0f
+#define RES_Y 640.0f
 
 struct Tri { float3 vertex0, vertex1, vertex2, centroid; };
 struct Ray { float3 O, D; float t = 1e30f; };
 
 Tri tri[N];
-uint triIndex[N];
+uint triIdx[N];
 
 BVHNode bvhNode[N*2 - 1];
-uint rootNodeIndex = 0, nodesUsed = 1; // Root node is used by default;
+uint rootNodeIdx = 0, nodesUsed = 1; // Root node is used by default;
 
+void ReadUnityModel() {
+  FILE* file = fopen( "assets/unity.tri", "r" );
+  float a, b, c, d, e, f, g, h, i;
+  for (int t = 0; t < N; t++) 
+  {
+    fscanf( file, "%f %f %f %f %f %f %f %f %f\n", 
+        &a, &b, &c, &d, &e, &f, &g, &h, &i );
+    tri[t].vertex0 = float3( a, b, c );
+    tri[t].vertex1 = float3( d, e, f );
+    tri[t].vertex2 = float3( g, h, i );
+  }
+  fclose( file );
+}
 
 void UpdateNodeBounds(uint nodeIndex) {
   BVHNode& node = bvhNode[nodeIndex];
@@ -28,14 +45,54 @@ void UpdateNodeBounds(uint nodeIndex) {
   node.aabbMax = float3(-1e30f);
 
   for (uint first = node.firstTriIndex, i = 0; i < node.triCount; i++) {
-    uint leafTriIndex = triIndex[first + i];
+    uint leafTriIndex = triIdx[first + i];
     Tri& leafTri = tri[leafTriIndex];
 
     node.aabbMin = fminf(node.aabbMin, fminf(leafTri.vertex0, fminf(leafTri.vertex1, leafTri.vertex2)));
     node.aabbMax = fmaxf(node.aabbMax, fmaxf(leafTri.vertex0, fmaxf(leafTri.vertex1, leafTri.vertex2)));
-    node.aabbMax = node.aabbMax * 1.13f; // For some reason the BVH don't fit quite right?
+    // node.aabbMax = node.aabbMax * 1.13f; // For some reason the BVH don't fit quite right?
   }
 }
+
+// void Subdivide( uint nodeIdx )
+// {
+// 	// terminate recursion
+// 	BVHNode& node = bvhNode[nodeIdx];
+// 	if (node.triCount <= 2) return;
+// 	// determine split axis and position
+// 	float3 extent = node.aabbMax - node.aabbMin;
+// 	int axis = 0;
+// 	if (extent.y > extent.x) axis = 1;
+// 	if (extent.z > extent[axis]) axis = 2;
+// 	float splitPos = node.aabbMin[axis] + extent[axis] * 0.5f;
+// 	// in-place partition
+// 	int i = node.leftNode;
+// 	int j = i + node.triCount - 1;
+// 	while (i <= j)
+// 	{
+// 		if (tri[triIdx[i]].centroid[axis] < splitPos)
+// 			i++;
+// 		else
+// 			std::swap( triIdx[i], triIdx[j--] );
+// 	}
+// 	// abort split if one of the sides is empty
+// 	int leftCount = i - node.leftNode;
+// 	if (leftCount == 0 || leftCount == node.triCount) return;
+// 	// create child nodes
+// 	int leftChildIdx = nodesUsed++;
+// 	int rightChildIdx = nodesUsed++;
+// 	bvhNode[leftChildIdx].leftNode = node.leftNode;
+// 	bvhNode[leftChildIdx].triCount = leftCount;
+// 	bvhNode[rightChildIdx].leftNode = i;
+// 	bvhNode[rightChildIdx].triCount = node.triCount - leftCount;
+// 	node.leftNode = leftChildIdx;
+// 	node.triCount = 0;
+// 	UpdateNodeBounds( leftChildIdx );
+// 	UpdateNodeBounds( rightChildIdx );
+// 	// recurse
+// 	Subdivide( leftChildIdx );
+// 	Subdivide( rightChildIdx );
+// }
 
 void Subdivide(uint nodeIndex) {
   BVHNode& node = bvhNode[nodeIndex];
@@ -49,14 +106,14 @@ void Subdivide(uint nodeIndex) {
 
   float splitPos = node.aabbMin[axis] + extent[axis] * 0.5f;
 
-  int i = node.firstTriIndex;
+  int i = node.leftNode;
   int j = i + node.triCount - 1;
 
   while (i <= j) {
-    if (tri[triIndex[i]].centroid[axis] < splitPos) {
+    if (tri[i].centroid[axis] < splitPos) {
       i++;
     } else {
-      std::swap(triIndex[i], triIndex[j--]);
+      std::swap(tri[i], tri[j--]);
     }
   }
 
@@ -65,7 +122,6 @@ void Subdivide(uint nodeIndex) {
   int leftChildIndex = nodesUsed++;
   int rightChildIndex = nodesUsed++;
 
-  node.leftNode = leftChildIndex;
 
   bvhNode[leftChildIndex].firstTriIndex = node.firstTriIndex;
   bvhNode[leftChildIndex].triCount = leftCount;
@@ -73,6 +129,7 @@ void Subdivide(uint nodeIndex) {
   bvhNode[rightChildIndex].firstTriIndex = i;
   bvhNode[rightChildIndex].triCount = node.triCount - leftCount;
 
+  node.leftNode = leftChildIndex;
   node.triCount = 0;
 
   UpdateNodeBounds(leftChildIndex);
@@ -82,19 +139,21 @@ void Subdivide(uint nodeIndex) {
   Subdivide(rightChildIndex);
 }
 
+
+
 void BuildBVH() {
   for (int i = 0; i < N; i++) {
     tri[i].centroid = (tri[i].vertex0 + tri[i].vertex1 + tri[i].vertex2) * 0.333f;
-    triIndex[i]  = i;
+    triIdx[i]  = i;
   }
 
-  BVHNode& root = bvhNode[rootNodeIndex];
+  BVHNode& root = bvhNode[rootNodeIdx];
   root.leftNode = 0;
   root.firstTriIndex = 0; 
   root.triCount = N;
 
-  UpdateNodeBounds(rootNodeIndex);
-  Subdivide(rootNodeIndex);
+  UpdateNodeBounds(rootNodeIdx);
+  Subdivide(rootNodeIdx);
 
 }
 
@@ -113,7 +172,7 @@ void IntersectTri(Ray& ray, const Tri& tri) {
   const float3 v0RayOrigin = ray.O - tri.vertex0;
 
   // First barycentric coordinate
-  const float u = dot(v0RayOrigin, h);
+  const float u = invDet * dot(v0RayOrigin, h);
 
   // Cant be inside the triangle if u < 0 or > 1
   if( u < 0 || u > 1.0f) return;
@@ -121,7 +180,7 @@ void IntersectTri(Ray& ray, const Tri& tri) {
   const float3 q = cross(v0RayOrigin, edge1);
 
   // Second barycentric coordinate
-  const float v = dot(ray.D, q);
+  const float v = invDet * dot(ray.D, q);
 
   // Same for v
   // Notice that we check if u+v > 1.0f
@@ -132,7 +191,7 @@ void IntersectTri(Ray& ray, const Tri& tri) {
   // At this point we're certain we hit the triangle.
   //
   // How far along the ray we intersected the triangle.
-  const float t = dot(edge2, q);
+  const float t = invDet * dot(edge2, q);
 
   // Account for numerical precision?
   if( t > 0.0001f ) {
@@ -167,7 +226,7 @@ void IntersectBVH(Ray& ray, const uint nodeIndex) {
 
   if(node.isLeaf()) {
     for (uint i = 0; i < node.triCount; i++) {
-     IntersectTri(ray, tri[triIndex[node.firstTriIndex + i]]);
+      IntersectTri(ray, tri[triIdx[node.firstTriIndex + i]]);
     }
   } else {
     IntersectBVH(ray, node.leftNode);
@@ -177,41 +236,39 @@ void IntersectBVH(Ray& ray, const uint nodeIndex) {
 
 int main() {
 
-  Image output = Image::magenta(640, 640);
+  Image output = Image::fromColor(RES_X, RES_Y, float3(0));
 
-  for (int i = 0 ; i < N; i++) {
-    float3 r0 (RandomFloat(), RandomFloat(), RandomFloat()); 
-    float3 r1 (RandomFloat(), RandomFloat(), RandomFloat()); 
-    float3 r2 (RandomFloat(), RandomFloat(), RandomFloat()); 
-
-    tri[i].vertex0 = r0 * 9 - float3(5);
-    tri[i].vertex1 = tri[i].vertex0 + r1;
-    tri[i].vertex2 = tri[i].vertex0 + r2;
-  }
-
-  float3 camPos(0, 0, -18);
-  float3 p0(-1, 1, -15), p1(1, 1, -15), p2(-1, -1, -15);
-  Ray ray;
-
+  ReadUnityModel();
   BuildBVH();
 
+  float3 p0(-1, 1, 2), p1(1, 1, 2), p2(-1, -1, 2);
+  Ray ray;
+  ray.O = float3(-1.5f, -0.2f, -2.5f);
 
-  for ( int y = 0; y < 640; y++) {
-    for ( int x = 0; x < 640; x++ ) {
+  float3 offset = normalize((p0 + p1 + p2) * 0.333f - ray.O);
+  offset = offset * 0.0f;
+
+  ray.O = ray.O + offset;
+  
+  auto start = std::chrono::high_resolution_clock::now();
+  for ( int y = 0; y < RES_Y; y++) {
+    printf("%.2f\r", ((float)y+1)/RES_Y * 100.0f);
+    std::flush(std::cout);
+    for ( int x = 0; x < RES_X; x++ ) {
       /*
-               |
-         p0    |     p1
-               |
-     ----------|------------
-               |     
-         p2    |
-               |
+                   |
+             p0    |     p1
+                   |
+         ----------|------------
+                   |     
+             p2    |
+                   |
 
          This enables us to get canvas positions in the square formed by
          p0, p1, p2.
-      */
-      float3 pixelPos = p0 + (p1-p0) * (x/640.0f) + (p2-p0) * (y/640.0f);
-      ray.O = camPos;
+     */
+
+      float3 pixelPos = ray.O + p0 + (p1-p0) * (x/RES_X) + (p2-p0) * (y/RES_Y);
       ray.D = normalize(pixelPos - ray.O);
       ray.t = 1e30f;
 
@@ -219,16 +276,24 @@ int main() {
       for ( int i = 0; i < N; i++) 
         IntersectTri(ray, tri[i]);
 #else 
-      IntersectBVH(ray, rootNodeIndex);
+      IntersectBVH(ray, rootNodeIdx);
 #endif
 
+      float c = (500 - ray.t * 42)/500.0f * 255.0f;
 
-      if(ray.t < 1e30f)
-        output.writeToPixel(x, y, float3(255, 255, 0));      
+      if(ray.t < 1e30f) {
+        printf("%f\n", c);
+        output.writeToPixel(x, y, float3(c));      
+      }
     }
   }
 
+  auto end = std::chrono::high_resolution_clock::now();
+  long duration = std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count();
+
+  printf("Tracing took %ld milliseconds\n", duration); 
   output.save("./output.ppm");
 
   return 0;
 }
+
