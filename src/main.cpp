@@ -29,11 +29,12 @@ void ReadUnityModel() {
   float a, b, c, d, e, f, g, h, i;
   for (int t = 0; t < N; t++) 
   {
-    fscanf( file, "%f %f %f %f %f %f %f %f %f\n", 
-        &a, &b, &c, &d, &e, &f, &g, &h, &i );
-    tri[t].vertex0 = float3( a, b, c );
-    tri[t].vertex1 = float3( d, e, f );
-    tri[t].vertex2 = float3( g, h, i );
+    if(fscanf( file, "%f %f %f %f %f %f %f %f %f\n", 
+          &a, &b, &c, &d, &e, &f, &g, &h, &i ) > 0) {
+      tri[t].vertex0 = float3( a, b, c );
+      tri[t].vertex1 = float3( d, e, f );
+      tri[t].vertex2 = float3( g, h, i );
+    }
   }
   fclose( file );
 }
@@ -132,8 +133,8 @@ int main() {
   
   auto start = std::chrono::high_resolution_clock::now();
   for ( int y = 0; y < RES_Y; y++) {
-    printf("%.2f\r", ((float)y+1)/RES_Y * 100.0f);
-    std::flush(std::cout);
+    // printf("%.2f\r", ((float)y+1)/RES_Y * 100.0f);
+    // std::flush(std::cout);
     for ( int x = 0; x < RES_X; x++ ) {
       /*
                    |
@@ -159,7 +160,7 @@ int main() {
       IntersectBVH(ray, rootNodeIdx);
 #endif
 
-      float c = (500 - ray.t * 42)/500.0f * 255.0f;
+      uint c = (255 - ray.t * 75);
 
       if(ray.t < 1e30f) {
         output.writeToPixel(x, y, float3(c));      
