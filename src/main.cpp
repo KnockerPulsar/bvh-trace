@@ -83,17 +83,17 @@ void IntersectTri(Ray& ray, const Tri& tri) {
 }
 
 float IntersectAABB(  Ray& ray, const float3 bmin, const float3 bmax ) {
-  float tx1 = (bmin.x - ray.O.x) / ray.D.x; float tx2 = (bmax.x - ray.O.x) / ray.D.x;
+  float tx1 = (bmin.x - ray.O.x) * ray.rD.x; float tx2 = (bmax.x - ray.O.x) * ray.rD.x;
 
   float tmin = fmin(tx1, tx2), tmax = fmax(tx1, tx2);
 
-  float ty1 = (bmin.y - ray.O.y) / ray.D.y;
-  float ty2 = (bmax.y - ray.O.y) / ray.D.y;
+  float ty1 = (bmin.y - ray.O.y) * ray.rD.y;
+  float ty2 = (bmax.y - ray.O.y) * ray.rD.y;
 
   tmin = fmax(tmin, fmin(ty1, ty2)), tmax = fmin(tmax, fmax(ty1, ty2));
 
-  float tz1 = (bmin.z - ray.O.z) / ray.D.z;
-  float tz2 = (bmax.z - ray.O.z) / ray.D.z;
+  float tz1 = (bmin.z - ray.O.z) * ray.rD.z;
+  float tz2 = (bmax.z - ray.O.z) * ray.rD.z;
 
   tmin = fmax(tmin, fmin(tz1, tz2)), tmax = fmin(tmax, fmax(tz1, tz2));
   bool hit = tmax >= tmin && tmin < ray.t && tmax > 0;
@@ -165,6 +165,7 @@ int main() {
 
       float3 pixelPos = ray.O + p0 + (p1-p0) * (x/RES_X) + (p2-p0) * (y/RES_Y);
       ray.D = normalize(pixelPos - ray.O);
+      ray.rD = float3(1/ray.D.x , 1/ray.D.y, 1/ray.D.z); 
       ray.t = 1e30f;
 
 #if 0
