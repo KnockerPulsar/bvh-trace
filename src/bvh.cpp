@@ -1,10 +1,12 @@
 #include "bvh.h"
 #include "aabb.h"
 #include "bvh_node.h"
+#include <chrono>
 #include <numeric>
 #include <stdio.h>
 
-#define EVALUATE_SAH 0
+#define EVALUATE_SAH 1
+#define SAH_TEST_PLANES 4
 
 Tri tri[N];
 uint triIdx[N];
@@ -49,36 +51,45 @@ float EvaluateSAH( BVHNode& node, int axis, float pos) {
   return cost > 0? cost: 1e30f;
 }
 
+float FindBestSplitPlane(BVHNode& node, int& axis, float& splitPos) {
+  float bestCost = 1e30f;
+
+  for( int a = 0; a < 3; a++) {
+    float boundsMin = node.aabbMin[a];
+    float boundsMax = node.aabbMax[a];
+
+    if(boundsMin == boundsMax) continue;
+    float scale = (boundsMax - boundsMin) / SAH_TEST_PLANES;
+
+    for( uint i = 1; i < SAH_TEST_PLANES; i++) {
+      float candidatePos = boundsMin + i * scale;
+      float cost = EvaluateSAH(node, a, candidatePos);
+      if(cost < bestCost)
+        splitPos = candidatePos, axis = a, bestCost = cost;
+    }
+  }
+
+  return bestCost;
+}
+
+float CalculateNodeCost( BVHNode& node ) {
+  float3 e = node.aabbMax - node.aabbMin;
+  float surfaceArea = e.x * e.y + e.x * e.z + e.y * e.z;
+  return node.triCount * surfaceArea;
+}
+
 void Subdivide(uint nodeIndex) {
   BVHNode& node = bvhNode[nodeIndex];
-
-  float3 extent = node.aabbMax - node.aabbMin;
 
   int axis = 0;
   float splitPos;
 
 #if EVALUATE_SAH
-  int bestAxis = -1;
-  float bestPos = 0, bestCost = 1e30f;
-
-  float parentArea = extent.x * extent.y + extent.x * extent.z + extent.y * extent.z;
-  float parentCost = node.triCount * parentArea;
-
-  for( int axis = 0; axis < 3; axis++) {
-    for( uint i = 0; i < node.triCount; i++) {
-      Tri& triangle = tri[triIdx[node.firstTriIndex + i]];
-      float candidatePos = triangle.centroid[axis];
-      float cost = EvaluateSAH(node, axis, candidatePos);
-      if(cost < bestCost)
-        bestPos = candidatePos, bestAxis = axis, bestCost = cost;
-    }
-  }
-
-  axis = bestAxis;
-  splitPos = bestPos;
-
-  if(bestCost >= parentCost) return; 
+  float bestCost = FindBestSplitPlane(node, axis, splitPos);
+  float noSplitCost = CalculateNodeCost(node);
+  if(bestCost >= noSplitCost) return; 
 #else
+  float3 extent = node.aabbMax - node.aabbMin;
   if(extent.y > extent.x) axis = 1;
   if(extent.z > extent[axis]) axis = 2;
 
@@ -120,7 +131,6 @@ void Subdivide(uint nodeIndex) {
 }
 
 void BuildBVH() {
-  printf("Building BVH\n");
   for (int i = 0; i < N; i++) {
     tri[i].centroid = (tri[i].vertex0 + tri[i].vertex1 + tri[i].vertex2) * 0.333f;
     triIdx[i]  = i;
@@ -132,7 +142,12 @@ void BuildBVH() {
   root.triCount = N;
 
   UpdateNodeBounds(rootNodeIdx);
+
+  printf("Building BVH\n");
+  auto start = std::chrono::high_resolution_clock::now();
   Subdivide(rootNodeIdx);
-  printf("Finished building BVH\n");
+  auto end = std::chrono::high_resolution_clock::now();
+  long duration = std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count();
+  printf("Finished building BVH, took %ld milliseconds\n", duration);
 }
 
