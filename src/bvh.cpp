@@ -14,8 +14,8 @@ uint rootNodeIdx = 0, nodesUsed = 1; // Root node is used by default;
 
 void UpdateNodeBounds(uint nodeIndex) {
   BVHNode& node = bvhNode[nodeIndex];
-  node.aabbMin = float3(1e30f);
-  node.aabbMax = float3(-1e30f);
+  node.aabbMin = make_float3(1e30f);
+  node.aabbMax = make_float3(-1e30f);
 
   for (uint first = node.firstTriIndex, i = 0; i < node.triCount; i++) {
     uint leafTriIndex = triIdx[first + i];

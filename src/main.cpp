@@ -7,6 +7,7 @@
 #include "tri.h"
 #include "ray.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -14,9 +15,27 @@
 #include <ostream>
 #include <type_traits>
 #include <chrono>
+#include <xmmintrin.h>
 
 #define RES_X 640.0f
 #define RES_Y 640.0f
+#define USE_SSE 1
+
+#define VMUL(a,b) _mm_mul_ps(a,b)
+#define VSUB(a,b) _mm_sub_ps(a,b)
+#define VAND(a,b) _mm_and_ps(a,b)
+#define VMAX(a,b) _mm_max_ps(a,b)
+#define VMIN(a,b) _mm_min_ps(a,b)
+
+template<unsigned i>
+float vecElem( __m128 V)
+{
+    // shuffle V so that the element that you want is moved to the least-
+    // significant element of the vector (V[0])
+    V = _mm_shuffle_ps(V, V, _MM_SHUFFLE(i, i, i, i));
+    // return the value in V[0]
+    return _mm_cvtss_f32(V);
+}
 
 extern Tri tri[N];
 extern uint triIdx[N];
@@ -31,9 +50,9 @@ void ReadUnityModel() {
   {
     if(fscanf( file, "%f %f %f %f %f %f %f %f %f\n", 
           &a, &b, &c, &d, &e, &f, &g, &h, &i ) > 0) {
-      tri[t].vertex0 = float3( a, b, c );
-      tri[t].vertex1 = float3( d, e, f );
-      tri[t].vertex2 = float3( g, h, i );
+      tri[t].vertex0 = make_float3( a, b, c );
+      tri[t].vertex1 = make_float3( d, e, f );
+      tri[t].vertex2 = make_float3( g, h, i );
     }
   }
   fclose( file );
@@ -100,6 +119,20 @@ float IntersectAABB(  Ray& ray, const float3 bmin, const float3 bmax ) {
   return hit? tmin : 1e30f;
 }
 
+float IntersectAABB_SSE(  Ray& ray, const __m128 bmin4, const __m128 bmax4 ) { 
+  static __m128 mask4 = _mm_cmpeq_ps(_mm_setzero_ps(), _mm_set_ps(1,0,0,0));
+
+  __m128 t1 = VMUL(VSUB(VAND(bmin4, mask4), ray.O4), ray.rD4);
+  __m128 t2 = VMUL(VSUB(VAND(bmax4, mask4), ray.O4), ray.rD4);
+
+  __m128 vmax4 = VMAX(t1,t2), vmin4 = VMIN(t1,t2);
+  float tmax = std::min(vecElem<0>(vmax4), std::min(vecElem<1>(vmax4), vecElem<2>(vmax4)));
+  float tmin = std::max(vecElem<0>(vmin4), std::max(vecElem<1>(vmin4), vecElem<2>(vmin4)));
+
+  bool hit = (tmax >= tmin) && tmin < ray.t && tmax > 0;
+  return hit? tmin : 1e30f;
+}
+
 void IntersectBVH(Ray& ray, const uint nodeIndex) {
   BVHNode* node = &bvhNode[nodeIndex];
   BVHNode* stack[64];
@@ -120,8 +153,13 @@ void IntersectBVH(Ray& ray, const uint nodeIndex) {
     BVHNode* child1 = &bvhNode[node->leftNode];
     BVHNode* child2 = &bvhNode[node->leftNode + 1];
 
+#if USE_SSE
+    float dist1 = IntersectAABB_SSE(ray, child1->aabbMin4, child1->aabbMax4);
+    float dist2 = IntersectAABB_SSE(ray, child2->aabbMin4, child2->aabbMax4);
+#else
     float dist1 = IntersectAABB(ray, child1->aabbMin, child1->aabbMax);
     float dist2 = IntersectAABB(ray, child2->aabbMin, child2->aabbMax);
+#endif
 
     if(dist1 > dist2) {std::swap(dist1, dist2); std::swap(child1, child2); }
     if(dist1 == 1e30f) {
@@ -136,14 +174,14 @@ void IntersectBVH(Ray& ray, const uint nodeIndex) {
 
 int main() {
 
-  Image output = Image::fromColor(RES_X, RES_Y, float3(0));
+  Image output = Image::fromColor(RES_X, RES_Y, make_float3(0));
 
   ReadUnityModel();
   BuildBVH();
 
-  float3 p0(-1, 1, 2), p1(1, 1, 2), p2(-1, -1, 2);
+  float3 p0{-1, 1, 2}, p1{1, 1, 2}, p2{-1, -1, 2};
   Ray ray;
-  ray.O = float3(-1.5f, -0.2f, -2.5f);
+  ray.O = make_float3(-1.5f, -0.2f, -2.5f);
 
   const int tile_size = 8;
 
@@ -166,7 +204,7 @@ int main() {
 
       float3 pixelPos = ray.O + p0 + (p1-p0) * ((x+u)/RES_X) + (p2-p0) * ((y+v)/RES_Y);
       ray.D = normalize(pixelPos - ray.O);
-      ray.rD = float3(1/ray.D.x , 1/ray.D.y, 1/ray.D.z); 
+      ray.rD = make_float3(1/ray.D.x , 1/ray.D.y, 1/ray.D.z); 
       ray.t = 1e30f;
 
       IntersectBVH(ray, rootNodeIdx);
@@ -174,7 +212,7 @@ int main() {
       uint c = (255 - ray.t * 75);
 
       if(ray.t < 1e30f) {
-        output.writeToPixel(x + u, y + v, float3(c));      
+        output.writeToPixel(x + u, y + v, make_float3(c));      
       }
     }
   }
