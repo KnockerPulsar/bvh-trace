@@ -12,6 +12,7 @@ CMAKE_POLICY(SET CMP0074 NEW)
 
 set(SOURCES 
   src/main.cpp
+  src/bvh.cpp
 )
 
 # Define the directories in which to search for the included headers
