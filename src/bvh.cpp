@@ -9,14 +9,14 @@
 #include <stdio.h>
 
 #define EVALUATE_SAH 1
-#define SAH_TEST_PLANES 4
-#define BINS 20
+#define BINS 4
 
 Tri tri[N];
+Tri original[N];
 uint triIdx[N];
 
 BVHNode bvhNode[N*2 - 1];
-uint rootNodeIdx = 0, nodesUsed = 1; // Root node is used by default;
+uint rootNodeIdx = 0, nodesUsed = 2; // Root node is used by default;
 
 void UpdateNodeBounds(uint nodeIndex) {
   BVHNode& node = bvhNode[nodeIndex];
@@ -173,10 +173,19 @@ void BuildBVH() {
     triIdx[i]  = i;
   }
 
+  nodesUsed = 2;
+
   BVHNode& root = bvhNode[rootNodeIdx];
   root.leftNode = 0;
   root.firstTriIndex = 0; 
   root.triCount = N;
+
+  for (int i = 1; i < N; i++) {
+     bvhNode[i].triCount = 0;
+     bvhNode[i].firstTriIndex = 0;
+     bvhNode[i].aabbMin = make_float3(1e30f);
+     bvhNode[i].aabbMax = make_float3(-1e30f);
+  }
 
   UpdateNodeBounds(rootNodeIdx);
 

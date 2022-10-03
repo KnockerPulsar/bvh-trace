@@ -29,6 +29,8 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG    ${PROJECT_SOURCE_DIR})
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE  ${PROJECT_SOURCE_DIR})
 set(CMAKE_EXPORT_COMPILE_COMMANDS TRUE)
 
+find_package(OpenMP REQUIRED)
+
 # For each example, we add an executable target
 # Each target compiles one example source file and the common & vendor source files
 # Then we link GLFW with each target
@@ -36,4 +38,12 @@ add_executable(${PROJECT_NAME} src/main.cpp ${SOURCES})
 
 target_link_libraries(
   ${PROJECT_NAME} 
+  PRIVATE OpenMP::OpenMP_CXX
+  -lraylib 
+  -lpthread 
+  -lGL 
+  -lm 
+  -lrt 
+  -lX11 
+  -ldl
 )

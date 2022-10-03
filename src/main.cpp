@@ -16,6 +16,8 @@
 #include <type_traits>
 #include <chrono>
 #include <xmmintrin.h>
+#include <raylib.h>
+#include <rlgl.h>
 
 #define RES_X 640.0f
 #define RES_Y 640.0f
@@ -27,14 +29,14 @@
 #define VMAX(a,b) _mm_max_ps(a,b)
 #define VMIN(a,b) _mm_min_ps(a,b)
 
-template<unsigned i>
+  template<unsigned i>
 float vecElem( __m128 V)
 {
-    // shuffle V so that the element that you want is moved to the least-
-    // significant element of the vector (V[0])
-    V = _mm_shuffle_ps(V, V, _MM_SHUFFLE(i, i, i, i));
-    // return the value in V[0]
-    return _mm_cvtss_f32(V);
+  // shuffle V so that the element that you want is moved to the least-
+  // significant element of the vector (V[0])
+  V = _mm_shuffle_ps(V, V, _MM_SHUFFLE(i, i, i, i));
+  // return the value in V[0]
+  return _mm_cvtss_f32(V);
 }
 
 extern Tri tri[N];
@@ -42,7 +44,7 @@ extern uint triIdx[N];
 
 extern BVHNode bvhNode[N*2 - 1];
 extern uint rootNodeIdx, nodesUsed; // Root node is used by default;
-                                     
+
 void ReadUnityModel() {
   FILE* file = fopen( "assets/unity.tri", "r" );
   float a, b, c, d, e, f, g, h, i;
@@ -58,7 +60,7 @@ void ReadUnityModel() {
   fclose( file );
 }
 
-void IntersectTri(Ray& ray, const Tri& tri) {
+void IntersectTri(bvt::Ray& ray, const Tri& tri) {
   float3 edge1 = tri.vertex1 - tri.vertex0;
   float3 edge2 = tri.vertex2 - tri.vertex0;
 
@@ -101,7 +103,7 @@ void IntersectTri(Ray& ray, const Tri& tri) {
 
 }
 
-float IntersectAABB(  Ray& ray, const float3 bmin, const float3 bmax ) {
+float IntersectAABB(  bvt::Ray& ray, const float3 bmin, const float3 bmax ) {
   float tx1 = (bmin.x - ray.O.x) * ray.rD.x; float tx2 = (bmax.x - ray.O.x) * ray.rD.x;
 
   float tmin = fmin(tx1, tx2), tmax = fmax(tx1, tx2);
@@ -119,7 +121,7 @@ float IntersectAABB(  Ray& ray, const float3 bmin, const float3 bmax ) {
   return hit? tmin : 1e30f;
 }
 
-float IntersectAABB_SSE(  Ray& ray, const __m128 bmin4, const __m128 bmax4 ) { 
+float IntersectAABB_SSE(  bvt::Ray& ray, const __m128 bmin4, const __m128 bmax4 ) { 
   static __m128 mask4 = _mm_cmpeq_ps(_mm_setzero_ps(), _mm_set_ps(1,0,0,0));
 
   __m128 t1 = VMUL(VSUB(VAND(bmin4, mask4), ray.O4), ray.rD4);
@@ -133,7 +135,7 @@ float IntersectAABB_SSE(  Ray& ray, const __m128 bmin4, const __m128 bmax4 ) {
   return hit? tmin : 1e30f;
 }
 
-void IntersectBVH(Ray& ray, const uint nodeIndex) {
+void IntersectBVH(bvt::Ray& ray, const uint nodeIndex) {
   BVHNode* node = &bvhNode[nodeIndex];
   BVHNode* stack[64];
   uint stackPtr = 0;
@@ -172,55 +174,86 @@ void IntersectBVH(Ray& ray, const uint nodeIndex) {
   }
 }
 
+
 int main() {
 
-  Image output = Image::fromColor(RES_X, RES_Y, make_float3(0));
+  bvt::Image output = bvt::Image::fromColor(RES_X, RES_Y, make_float3(0));
 
   ReadUnityModel();
+
+  InitWindow(RES_X, RES_Y, "BVH Tracer");
+
+  Texture frameBuffer = LoadTextureFromImage({
+      .data = (void*)output.getData().data(),             
+      .width = (int) RES_X,              
+      .height = (int) RES_Y,
+      .mipmaps = 1,
+      .format = RL_PIXELFORMAT_UNCOMPRESSED_R8G8B8
+      });
+
   BuildBVH();
 
   float3 p0{-1, 1, 2}, p1{1, 1, 2}, p2{-1, -1, 2};
-  Ray ray;
+  bvt::Ray ray;
   ray.O = make_float3(-1.5f, -0.2f, -2.5f);
+  float originalX = ray.O.x;
 
   const int tile_size = 8;
 
-  auto start = std::chrono::high_resolution_clock::now();
-  for ( int y = 0; y < RES_Y; y += tile_size) for ( int x = 0; x < RES_X; x += tile_size ) {
-    for (int u = 0; u < tile_size; u++) for (int v = 0; v < tile_size ; v++ ) {
+  while(!WindowShouldClose()) {
 
-      /*
-                   |
-             p0    |     p1
-                   |
-         ----------|------------
-                   |     
-             p2    |
-                   |
+    BuildBVH();
 
-         This enables us to get canvas positions in the square formed by
-         p0, p1, p2.
-      */
+#pragma parallel for schedule(dynamic)
+    auto start = std::chrono::high_resolution_clock::now();
+    for (int tile = 0; tile < 6400; tile++) {
+      int x = tile % 80, y = tile / 80;
+      for (int u = 0; u < tile_size; u++) for (int v = 0; v < tile_size ; v++ ) {
 
-      float3 pixelPos = ray.O + p0 + (p1-p0) * ((x+u)/RES_X) + (p2-p0) * ((y+v)/RES_Y);
-      ray.D = normalize(pixelPos - ray.O);
-      ray.rD = make_float3(1/ray.D.x , 1/ray.D.y, 1/ray.D.z); 
-      ray.t = 1e30f;
+        /*
+           |
+           p0    |     p1
+           |
+           ----------|------------
+           |     
+           p2    |
+           |
 
-      IntersectBVH(ray, rootNodeIdx);
+           This enables us to get canvas positions in the square formed by
+           p0, p1, p2.
+           */
 
-      uint c = (255 - ray.t * 75);
+        float3 pixelPos = ray.O + p0 + (p1-p0) * ((x * 8 +u)/RES_X) + (p2-p0) * ((y * 8+v)/RES_Y);
+        ray.D = normalize(pixelPos - ray.O);
+        ray.D.x += cosf(GetTime() * 0.5f) * 0.25f;
+        ray.rD = make_float3(1/ray.D.x , 1/ray.D.y, 1/ray.D.z); 
+        ray.t = 1e30f;
 
-      if(ray.t < 1e30f) {
-        output.writeToPixel(x + u, y + v, make_float3(c));      
+        IntersectBVH(ray, rootNodeIdx);
+
+        uint c = (255 - ray.t * 75);
+
+        if(ray.t < 1e30f) {
+          output.writeToPixel(x * 8 + u, y * 8 + v, make_float3(c));      
+        }
       }
     }
+
+    auto end = std::chrono::high_resolution_clock::now();
+    long duration = std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count();
+
+    printf("Tracing took %ld milliseconds\n", duration); 
+
+    BeginDrawing();
+    ClearBackground(BLACK);
+
+    UpdateTexture(frameBuffer, (void*)output.getData().data());
+
+    DrawTexture(frameBuffer, 0, 0, WHITE);
+    EndDrawing();
+
+    output.clear();
   }
-
-  auto end = std::chrono::high_resolution_clock::now();
-  long duration = std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count();
-
-  printf("Tracing took %ld milliseconds\n", duration); 
   output.save("./output.ppm");
 
   return 0;
