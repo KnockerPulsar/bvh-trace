@@ -46,8 +46,10 @@ extern BVHNode bvhNode[N*2 - 1];
 extern uint rootNodeIdx, nodesUsed; // Root node is used by default;
 
 void ReadUnityModel() {
-  FILE* file = fopen( "assets/unity.tri", "r" );
+  FILE* file = fopen( "assets/bigben.tri", "r" );
   float a, b, c, d, e, f, g, h, i;
+
+  float3 center = make_float3(0);
   for (int t = 0; t < N; t++) 
   {
     if(fscanf( file, "%f %f %f %f %f %f %f %f %f\n", 
@@ -55,8 +57,17 @@ void ReadUnityModel() {
       tri[t].vertex0 = make_float3( a, b, c );
       tri[t].vertex1 = make_float3( d, e, f );
       tri[t].vertex2 = make_float3( g, h, i );
+
+      center.x += a+d+g;
+      center.y += b+e+h;
+      center.z += c+f+i;
     }
   }
+
+  center = center * (1.0f/N);
+
+  printf("Center at (%f, %f, %f)\n", center.x, center.y, center.z);
+
   fclose( file );
 }
 
@@ -135,8 +146,8 @@ float IntersectAABB_SSE(  bvt::Ray& ray, const __m128 bmin4, const __m128 bmax4 
   return hit? tmin : 1e30f;
 }
 
-void IntersectBVH(bvt::Ray& ray, const uint nodeIndex) {
-  BVHNode* node = &bvhNode[nodeIndex];
+void IntersectBVH(bvt::Ray& ray) {
+  BVHNode* node = &bvhNode[rootNodeIdx];
   BVHNode* stack[64];
   uint stackPtr = 0;
 
@@ -174,6 +185,9 @@ void IntersectBVH(bvt::Ray& ray, const uint nodeIndex) {
   }
 }
 
+void animate() {
+
+}
 
 int main() {
 
@@ -194,9 +208,6 @@ int main() {
   BuildBVH();
 
   float3 p0{-1, 1, 2}, p1{1, 1, 2}, p2{-1, -1, 2};
-  bvt::Ray ray;
-  ray.O = make_float3(-1.5f, -0.2f, -2.5f);
-  float originalX = ray.O.x;
 
   const int tile_size = 8;
 
@@ -208,7 +219,9 @@ int main() {
     auto start = std::chrono::high_resolution_clock::now();
     for (int tile = 0; tile < 6400; tile++) {
       int x = tile % 80, y = tile / 80;
-      for (int u = 0; u < tile_size; u++) for (int v = 0; v < tile_size ; v++ ) {
+      bvt::Ray ray;
+      ray.O = make_float3(0, 3.5f, -4.5f);
+      for (int v = 0; v < tile_size ; v++ ) for (int u = 0; u < tile_size; u++) {
 
         /*
            |
@@ -225,13 +238,12 @@ int main() {
 
         float3 pixelPos = ray.O + p0 + (p1-p0) * ((x * 8 +u)/RES_X) + (p2-p0) * ((y * 8+v)/RES_Y);
         ray.D = normalize(pixelPos - ray.O);
-        ray.D.x += cosf(GetTime() * 0.5f) * 0.25f;
         ray.rD = make_float3(1/ray.D.x , 1/ray.D.y, 1/ray.D.z); 
         ray.t = 1e30f;
 
-        IntersectBVH(ray, rootNodeIdx);
+        IntersectBVH(ray);
 
-        uint c = (255 - ray.t * 75);
+        uint c = (255 - (int)((ray.t - 4) * 180));
 
         if(ray.t < 1e30f) {
           output.writeToPixel(x * 8 + u, y * 8 + v, make_float3(c));      
