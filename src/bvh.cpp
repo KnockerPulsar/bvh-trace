@@ -197,3 +197,22 @@ void BuildBVH() {
   /* printf("Finished building BVH, took %ld milliseconds\n", duration); */
 }
 
+// Bottom up refit
+// Should be used only for slight movements where triangles don't move between nodes.
+void RefitBVH() {
+  for (int i = nodesUsed - 1; i > 1; i--) {
+    BVHNode& node = bvhNode[i];
+
+    if(node.isLeaf()) {
+      UpdateNodeBounds(i);
+      continue;
+    }
+
+    BVHNode& leftChild = bvhNode[node.leftNode];
+    BVHNode& rightChild = bvhNode[node.leftNode + 1];
+
+    node.aabbMin = fminf(leftChild.aabbMin, rightChild.aabbMin);
+    node.aabbMax = fmaxf(leftChild.aabbMax, rightChild.aabbMax);
+  }
+}
+

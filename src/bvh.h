@@ -9,3 +9,4 @@
 void UpdateNodeBounds(uint nodeIndex);
 void Subdivide(uint nodeIndex);
 void BuildBVH();
+void RefitBVH();

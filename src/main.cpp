@@ -198,6 +198,8 @@ void Animate() {
     // with iteration instead of having to write them manually
     float3 o = (&original[i].vertex0)[j];
 
+    // Makes the rotation angle scale with the y axis position (height)
+    // of the vertex so the base doesn't move but the edges move significantly.
     float s = a * (o.y - 0.2f) * 0.2f;
 
     // Rotating about the z axis?
