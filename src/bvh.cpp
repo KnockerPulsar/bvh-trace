@@ -189,11 +189,11 @@ void BuildBVH() {
 
   UpdateNodeBounds(rootNodeIdx);
 
-  printf("Building BVH\n");
-  auto start = std::chrono::high_resolution_clock::now();
+  /* printf("Building BVH\n"); */
+  /* auto start = std::chrono::high_resolution_clock::now(); */
   Subdivide(rootNodeIdx);
-  auto end = std::chrono::high_resolution_clock::now();
-  long duration = std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count();
-  printf("Finished building BVH, took %ld milliseconds\n", duration);
+  /* auto end = std::chrono::high_resolution_clock::now(); */
+  /* long duration = std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count(); */
+  /* printf("Finished building BVH, took %ld milliseconds\n", duration); */
 }
 

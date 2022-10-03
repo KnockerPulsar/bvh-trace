@@ -39,7 +39,7 @@ float vecElem( __m128 V)
   return _mm_cvtss_f32(V);
 }
 
-extern Tri tri[N];
+extern Tri tri[N], original[N];
 extern uint triIdx[N];
 
 extern BVHNode bvhNode[N*2 - 1];
@@ -57,6 +57,8 @@ void ReadUnityModel() {
       tri[t].vertex0 = make_float3( a, b, c );
       tri[t].vertex1 = make_float3( d, e, f );
       tri[t].vertex2 = make_float3( g, h, i );
+
+      original[t] = tri[t];
 
       center.x += a+d+g;
       center.y += b+e+h;
@@ -185,8 +187,25 @@ void IntersectBVH(bvt::Ray& ray) {
   }
 }
 
-void animate() {
+void Animate() {
+  static float r = 0;
+  if((r+=0.05f) > 2 * PI) r -= 2 * PI;
 
+  float a = sinf(r) * 0.5f;
+  for (int i = 0; i < N; i++) for (int j = 0; j < 3; j++) {
+
+    // So you can access vertex0, vertex1, and vertex2
+    // with iteration instead of having to write them manually
+    float3 o = (&original[i].vertex0)[j];
+
+    float s = a * (o.y - 0.2f) * 0.2f;
+
+    // Rotating about the z axis?
+    float x = o.x * cosf( s ) - o.y * sinf( s );
+    float y = o.x * sinf( s ) + o.y * cosf( s );
+
+    (&tri[i].vertex0)[j] = make_float3(x,y,o.z);
+  }
 }
 
 int main() {
@@ -212,7 +231,7 @@ int main() {
   const int tile_size = 8;
 
   while(!WindowShouldClose()) {
-
+    Animate();
     BuildBVH();
 
 #pragma parallel for schedule(dynamic)
