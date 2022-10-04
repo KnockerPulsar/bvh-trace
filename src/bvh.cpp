@@ -13,9 +13,6 @@
 #include <raylib.h>
 #include <stdio.h>
 
-#define EVALUATE_SAH 1
-#define BINS 4
-
 bvt::BVH bvh[2];
 
 namespace bvt {

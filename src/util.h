@@ -1,6 +1,5 @@
+#include "config.h"
 #include "bvh.h"
-
-#define USE_SSE 1
 
 #define VMUL(a,b) _mm_mul_ps(a,b)
 #define VSUB(a,b) _mm_sub_ps(a,b)

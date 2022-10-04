@@ -7,6 +7,7 @@
 #include "tri.h"
 #include "ray.h"
 #include "tlas.h"
+#include "config.h"
 
 #include <algorithm>
 #include <cmath>
@@ -19,9 +20,6 @@
 #include <xmmintrin.h>
 #include <raylib.h>
 #include <rlgl.h>
-
-#define RES_X 640.0f
-#define RES_Y 640.0f
 
 extern bvt::BVH bvh[2];
 extern TLAS tlas;
