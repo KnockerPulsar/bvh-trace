@@ -1,68 +1,54 @@
 #pragma once
+#include <algorithm>
 #include <numeric>
 #include <math.h>
 #define ALIGN(x) __attribute__( ( aligned(x) ))
 
+struct mat4;
+
 struct ALIGN(16) float3 {
   float3() = default;
   
-  union { struct { float x,y,z, dummy; }; float cell[4]; };
+  union { struct { float x,y,z, w; }; float cell[4]; };
   float operator[] (const int n) const { return cell[n]; }
 };
 
-inline float3 make_float3(float a) {
-  return float3 { a, a, a };  
-}
+float3 make_float3(float a); 
+float3 make_float3(float a, float b, float c);
+float3 make_float3(float a, float b, float c, float d);
+float3 make_float3(float3 a, float w);
+float3 operator*(const float3& a, float b);
+float3 operator*(const float3& a, const float3& b);
+float3 operator+(const float3& a, const float3& b);
+float3 operator-(const float3& a, const float3& b);
+float3 cross(const float3& a, const float3& b);
+float dot(const float3& a, const float3& b);
+float3 normalize(const float3 a);
 
-inline float3 make_float3(float a, float b, float c) {
-  return float3 { a, b, c };  
-}
+float3 fminf(const float3& a, const float3& b);
+float3 fmaxf(const float3& a, const float3& b);
 
-inline float3 operator*(const float3& a, float b) {
-  return float3{a.x * b, a.y * b, a.z * b};
-}
-
-inline float3 operator*(const float3& a, const float3& b) {
-  return float3{a.x * b.x, a.y * b.y, a.z * b.z};
-}
-
-inline float3 operator+(const float3& a, const float3& b) {
-  return float3{a.x + b.x, a.y + b.y, a.z + b.z};
-}
-
-inline float3 operator-(const float3& a, const float3& b) {
-  return float3{a.x - b.x, a.y - b.y, a.z - b.z};
-}
-
-inline float3 cross(const float3& a, const float3& b) {
-  return float3{
-      a.y * b.z - a.z * b.y,
-      -(a.x * b.z - b.x * a.z),
-      a.x * b.y - b.x * a.y
+// Column major
+struct ALIGN(16) mat4 {
+  float cell[16] = {
+    1, 0, 0, 0,
+    0, 1, 0, 0,
+    0, 0, 1, 0,
+    0, 0, 0, 1
   };
-}
 
-inline float dot(const float3& a, const float3& b) {
-  return a.x * b.x + a.y * b.y + a.z * b.z;
-}
+  float& operator[] (const int idx) { return cell[idx]; }
+  float operator() (const int i, const int j) const { return cell[i * 4 + j]; }
+  float& operator() (const int i, const int j) { return cell[i * 4 + j]; }
 
-inline float3 normalize(const float3 a) {
-  float3 invLen = make_float3(1 / sqrtf(dot(a,a)));
-  return a * invLen;
-}
+  static mat4 Translate(const float x, const float y, const float z);
+  static mat4 Translate( const float3& p);
+  static mat4 RotateY(float a);
 
-inline float3 fminf(const float3& a, const float3& b) {
-  return float3 {
-    fminf(a.x, b.x),
-    fminf(a.y, b.y),
-    fminf(a.z, b.z)
-  };
-}
+  mat4 Inverted() const; 
+};
 
-inline float3 fmaxf(const float3& a, const float3& b) {
-  return float3 { 
-    fmaxf(a.x, b.x),
-    fmaxf(a.y, b.y),
-    fmaxf(a.z, b.z)
-  };
-}
+float3 operator* (const float3& b, const mat4& a);
+mat4 operator* (const mat4& a, const mat4& b);
+float3 TransformPosition( const float3& a, const mat4& M);
+float3 TransformVector( const float3& a, const mat4& M);

@@ -22,9 +22,8 @@
 #define RES_X 640.0f
 #define RES_Y 640.0f
 #define USE_SSE 1
-extern bvt::BVH bvh;
 
-
+extern bvt::BVH bvh[2];
 
 
 /* void Animate() { */
@@ -53,7 +52,10 @@ extern bvt::BVH bvh;
 int main() {
 
   bvt::Image output = bvt::Image::fromColor(RES_X, RES_Y, make_float3(0));
-  bvh = bvt::BVH("assets/bigben.tri", 20944);
+
+  float3 p0{-1, 1, 2}, p1{1, 1, 2}, p2{-1, -1, 2};
+  bvh[0] = bvt::BVH("assets/bigben.tri", 20944);
+  bvh[1] = bvt::BVH("assets/bigben.tri", 20944);
 
 
   InitWindow(RES_X, RES_Y, "BVH Tracer");
@@ -66,17 +68,25 @@ int main() {
       .format = RL_PIXELFORMAT_UNCOMPRESSED_R8G8B8
       });
 
-  float3 p0{-1, 1, 2}, p1{1, 1, 2}, p2{-1, -1, 2};
 
   const int tile_size = 8;
 
   while(!WindowShouldClose()) {
+    static float angle = 0;
+    angle += 0.01f; if (angle > 2 * PI) angle -= 2 * PI;
+
+    bvh[0].SetTranform(mat4::Translate(-1.3f, 0, 0));
+    bvh[1].SetTranform(mat4::Translate(1.3f, 0, 0) * mat4::RotateY(angle));
+
 #pragma parallel for schedule(dynamic)
+
     auto start = std::chrono::high_resolution_clock::now();
     for (int tile = 0; tile < 6400; tile++) {
+
       int x = tile % 80, y = tile / 80;
       bvt::Ray ray;
-      ray.O = make_float3(0, 3.5f, -4.5f);
+      ray.O = make_float3(1, 3.5f, -4.5f);
+
       for (int v = 0; v < tile_size ; v++ ) for (int u = 0; u < tile_size; u++) {
 
         /*
@@ -97,7 +107,8 @@ int main() {
         ray.rD = make_float3(1/ray.D.x , 1/ray.D.y, 1/ray.D.z); 
         ray.t = 1e30f;
 
-        bvh.Intersect(ray);
+        bvh[0].Intersect(ray);
+        bvh[1].Intersect(ray);
 
         uint c = (255 - (int)((ray.t - 4) * 180));
 

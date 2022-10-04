@@ -3,10 +3,12 @@
 #include "bin.h"
 #include "bvh_node.h"
 #include "tri.h"
+#include "vec_math.h"
 #include <algorithm>
 #include <chrono>
 #include <cstdlib>
 #include <numeric>
+#include <raylib.h>
 #include <stdio.h>
 
 #define EVALUATE_SAH 1
@@ -18,7 +20,7 @@
 #define VMAX(a,b) _mm_max_ps(a,b)
 #define VMIN(a,b) _mm_min_ps(a,b)
 
-bvt::BVH bvh;
+bvt::BVH bvh[2];
 
 namespace bvt {
 
@@ -336,6 +338,13 @@ float IntersectAABB_SSE(  bvt::Ray& ray, const __m128 bmin4, const __m128 bmax4 
   }
 
   void BVH::Intersect(bvt::Ray& ray) {
+    Ray backupRay = ray;
+
+    ray.O = TransformPosition(ray.O, invTransform);
+    ray.D = TransformVector(ray.D, invTransform);
+    ray.rD = make_float3(1 / ray.D.x, 1 / ray.D.y, 1 / ray.D.z);
+
+
     BVHNode* node = &bvhNode[0];
     BVHNode* stack[64];
     uint stackPtr = 0;
@@ -371,6 +380,19 @@ float IntersectAABB_SSE(  bvt::Ray& ray, const __m128 bmin4, const __m128 bmax4 
         node = child1;
         if(dist2 != 1e30f) stack[stackPtr++] = child2;
       }
+    }
+
+    backupRay.t = ray.t;
+    ray = backupRay;
+  }
+
+  void BVH::SetTranform(const mat4 &transform) {
+    invTransform = transform.Inverted();
+    float3 bmin = bvhNode[0].aabbMin, bmax = bvhNode[0].aabbMax;
+
+    bounds = AABB();
+    for (int i = 0; i < 8; i++) {
+      bounds.grow(TransformPosition(make_float3(i & 1? bmax.x : bmin.x, i & 2? bmax.y : bmin.y, i & 4? bmax.z : bmin.z), transform));
     }
   }
 }
