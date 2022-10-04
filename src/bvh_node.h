@@ -17,7 +17,7 @@ struct BVHNode {
     __m128 aabbMin4;
   };
   union {
-    struct { float3 aabbMax; uint triCount; };
+    struct { float3 aabbMax; uint triCount = 0; };
     __m128 aabbMax4;
   };
 
