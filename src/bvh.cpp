@@ -4,6 +4,8 @@
 #include "bvh_node.h"
 #include "tri.h"
 #include "vec_math.h"
+#include "util.h"
+
 #include <algorithm>
 #include <chrono>
 #include <cstdlib>
@@ -14,27 +16,9 @@
 #define EVALUATE_SAH 1
 #define BINS 4
 
-#define VMUL(a,b) _mm_mul_ps(a,b)
-#define VSUB(a,b) _mm_sub_ps(a,b)
-#define VAND(a,b) _mm_and_ps(a,b)
-#define VMAX(a,b) _mm_max_ps(a,b)
-#define VMIN(a,b) _mm_min_ps(a,b)
-
 bvt::BVH bvh[2];
 
 namespace bvt {
-
-
-  template<unsigned i>
-  float vecElem( __m128 V)
-  {
-    // shuffle V so that the element that you want is moved to the least-
-    // significant element of the vector (V[0])
-    V = _mm_shuffle_ps(V, V, _MM_SHUFFLE(i, i, i, i));
-    // return the value in V[0]
-    return _mm_cvtss_f32(V);
-  }
-
   void IntersectTri(bvt::Ray& ray, const Tri& tri) {
     float3 edge1 = tri.vertex1 - tri.vertex0;
     float3 edge2 = tri.vertex2 - tri.vertex0;
@@ -78,37 +62,6 @@ namespace bvt {
 
   }
 
-  float IntersectAABB(  bvt::Ray& ray, const float3 bmin, const float3 bmax ) {
-    float tx1 = (bmin.x - ray.O.x) * ray.rD.x; float tx2 = (bmax.x - ray.O.x) * ray.rD.x;
-
-    float tmin = fmin(tx1, tx2), tmax = fmax(tx1, tx2);
-
-    float ty1 = (bmin.y - ray.O.y) * ray.rD.y;
-    float ty2 = (bmax.y - ray.O.y) * ray.rD.y;
-
-    tmin = fmax(tmin, fmin(ty1, ty2)), tmax = fmin(tmax, fmax(ty1, ty2));
-
-    float tz1 = (bmin.z - ray.O.z) * ray.rD.z;
-    float tz2 = (bmax.z - ray.O.z) * ray.rD.z;
-
-    tmin = fmax(tmin, fmin(tz1, tz2)), tmax = fmin(tmax, fmax(tz1, tz2));
-    bool hit = tmax >= tmin && tmin < ray.t && tmax > 0;
-    return hit? tmin : 1e30f;
-  }
-
-float IntersectAABB_SSE(  bvt::Ray& ray, const __m128 bmin4, const __m128 bmax4 ) { 
-  static __m128 mask4 = _mm_cmpeq_ps(_mm_setzero_ps(), _mm_set_ps(1,0,0,0));
-
-  __m128 t1 = VMUL(VSUB(VAND(bmin4, mask4), ray.O4), ray.rD4);
-  __m128 t2 = VMUL(VSUB(VAND(bmax4, mask4), ray.O4), ray.rD4);
-
-  __m128 vmax4 = VMAX(t1,t2), vmin4 = VMIN(t1,t2);
-  float tmax = std::min(vecElem<0>(vmax4), std::min(vecElem<1>(vmax4), vecElem<2>(vmax4)));
-  float tmin = std::max(vecElem<0>(vmin4), std::max(vecElem<1>(vmin4), vecElem<2>(vmin4)));
-
-  bool hit = (tmax >= tmin) && tmin < ray.t && tmax > 0;
-  return hit? tmin : 1e30f;
-}
   BVH::BVH(char * triFile, int n) {
     FILE* file = fopen( triFile, "r" );
     float a, b, c, d, e, f, g, h, i;
@@ -364,13 +317,8 @@ float IntersectAABB_SSE(  bvt::Ray& ray, const __m128 bmin4, const __m128 bmax4 
       BVHNode* child1 = &bvhNode[node->leftNode];
       BVHNode* child2 = &bvhNode[node->leftNode + 1];
 
-#if USE_SSE
-      float dist1 = IntersectAABB_SSE(ray, child1->aabbMin4, child1->aabbMax4);
-      float dist2 = IntersectAABB_SSE(ray, child2->aabbMin4, child2->aabbMax4);
-#else
-      float dist1 = IntersectAABB(ray, child1->aabbMin, child1->aabbMax);
-      float dist2 = IntersectAABB(ray, child2->aabbMin, child2->aabbMax);
-#endif
+      float dist1 = INTERSECT_AABB(ray, child1); 
+      float dist2 =  INTERSECT_AABB(ray, child2);  
 
       if(dist1 > dist2) {std::swap(dist1, dist2); std::swap(child1, child2); }
       if(dist1 == 1e30f) {

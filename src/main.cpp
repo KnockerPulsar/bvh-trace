@@ -6,6 +6,7 @@
 #include "bvh.h"
 #include "tri.h"
 #include "ray.h"
+#include "tlas.h"
 
 #include <algorithm>
 #include <cmath>
@@ -21,9 +22,9 @@
 
 #define RES_X 640.0f
 #define RES_Y 640.0f
-#define USE_SSE 1
 
 extern bvt::BVH bvh[2];
+extern TLAS tlas;
 
 
 /* void Animate() { */
@@ -57,6 +58,8 @@ int main() {
   bvh[0] = bvt::BVH("assets/bigben.tri", 20944);
   bvh[1] = bvt::BVH("assets/bigben.tri", 20944);
 
+  tlas = TLAS(bvh, 2);
+  tlas.Build();
 
   InitWindow(RES_X, RES_Y, "BVH Tracer");
 
@@ -107,8 +110,7 @@ int main() {
         ray.rD = make_float3(1/ray.D.x , 1/ray.D.y, 1/ray.D.z); 
         ray.t = 1e30f;
 
-        bvh[0].Intersect(ray);
-        bvh[1].Intersect(ray);
+        tlas.Intersect(ray);
 
         uint c = (255 - (int)((ray.t - 4) * 180));
 
