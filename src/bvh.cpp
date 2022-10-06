@@ -1,6 +1,7 @@
 #include "bvh.h"
 #include "aabb.h"
 #include "bin.h"
+#include "bvh_instance.h"
 #include "bvh_node.h"
 #include "tri.h"
 #include "vec_math.h"
@@ -13,7 +14,7 @@
 #include <raylib.h>
 #include <stdio.h>
 
-bvt::BVH bvh[2];
+BVHInstance bvhInstance[256];
 
 namespace bvt {
   void IntersectTri(bvt::Ray& ray, const Tri& tri) {
@@ -89,7 +90,7 @@ namespace bvt {
 
     center = center * (1.0f/n);
 
-    printf("Center at (%f, %f, %f)\n", center.x, center.y, center.z);
+    /* printf("Center at (%f, %f, %f)\n", center.x, center.y, center.z); */
 
     fclose( file );
 
@@ -288,13 +289,6 @@ namespace bvt {
   }
 
   void BVH::Intersect(bvt::Ray& ray) {
-    Ray backupRay = ray;
-
-    ray.O = TransformPosition(ray.O, invTransform);
-    ray.D = TransformVector(ray.D, invTransform);
-    ray.rD = make_float3(1 / ray.D.x, 1 / ray.D.y, 1 / ray.D.z);
-
-
     BVHNode* node = &bvhNode[0];
     BVHNode* stack[64];
     uint stackPtr = 0;
@@ -325,19 +319,6 @@ namespace bvt {
         node = child1;
         if(dist2 != 1e30f) stack[stackPtr++] = child2;
       }
-    }
-
-    backupRay.t = ray.t;
-    ray = backupRay;
-  }
-
-  void BVH::SetTranform(const mat4 &transform) {
-    invTransform = transform.Inverted();
-    float3 bmin = bvhNode[0].aabbMin, bmax = bvhNode[0].aabbMax;
-
-    bounds = AABB();
-    for (int i = 0; i < 8; i++) {
-      bounds.grow(TransformPosition(make_float3(i & 1? bmax.x : bmin.x, i & 2? bmax.y : bmin.y, i & 4? bmax.z : bmin.z), transform));
     }
   }
 }

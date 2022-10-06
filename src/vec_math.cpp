@@ -20,6 +20,10 @@ float3 operator*(const float3& a, float b) {
   return float3{a.x * b, a.y * b, a.z * b};
 }
 
+float3 operator-(const float3& a, float b) {
+  return a - make_float3(b,b,b);
+}
+
 float3 operator*(const float3& a, const float3& b) {
   return float3{a.x * b.x, a.y * b.y, a.z * b.z};
 }
@@ -30,6 +34,17 @@ float3 operator+(const float3& a, const float3& b) {
 
 float3 operator-(const float3& a, const float3& b) {
   return float3{a.x - b.x, a.y - b.y, a.z - b.z};
+}
+
+
+float3 operator*=(float3& a, float b) {
+  a = a * b;
+  return a;
+}
+
+float3 operator+=(float3& a, const float3& b) {
+  a = a + b;
+  return a;
 }
 
 float3 cross(const float3& a, const float3& b) {
@@ -82,11 +97,39 @@ mat4 mat4::Translate( const float3& p) {
 mat4 mat4::RotateY(float a) {
   return {
     cosf(a), 0, -sinf(a), 0,
-      0      , 1, 0       , 0,
-      sinf(a), 0, cosf(a) , 0,
-      0      , 0, 0       , 1
+    0      , 1, 0       , 0,
+    sinf(a), 0, cosf(a) , 0,
+    0      , 0, 0       , 1
   };
 }
+
+mat4 mat4::RotateX(float a) {
+  return {
+      1, 0       , 0      , 0,
+      0, cosf(a) , sinf(a), 0,
+      0, -sinf(a), cosf(a), 0,
+      0, 0       , 0      , 1
+  };
+}
+
+mat4 mat4::RotateZ(float a) {
+  return {
+      cosf(a) , sinf(a), 0, 0,
+      -sinf(a), cosf(a), 0, 0,
+      0       , 0    , 1  , 0,
+      0       , 0    , 0  , 1
+  };
+}
+
+mat4 mat4::Scale(float a) {
+  return {
+    a, 0, 0, 0,
+    0, a, 0, 0,
+    0, 0, a, 0,
+    0, 0, 0, 1
+  };
+}
+
 
 mat4 mat4::Inverted() const {
   double inv[16], det;

@@ -5,11 +5,19 @@
 
 struct TLASNode {
   union { 
-    struct {float3 aabbMin; uint leftBLAS;};
+    struct {
+      float3 aabbMin; 
+
+      // Left = first 16 bits
+      // Right = second 16 bits
+      uint leftRight;
+    };
     __m128 aabbMin4;
   };
   union {
-    struct {float3 aabbMax; uint isLeaf;};
+    struct {float3 aabbMax; uint BLAS;};
     __m128 aabbMax4;
   };
+
+  bool isLeaf() { return leftRight == 0; }
 };

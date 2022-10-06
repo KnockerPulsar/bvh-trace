@@ -17,10 +17,17 @@ float3 make_float3(float a);
 float3 make_float3(float a, float b, float c);
 float3 make_float3(float a, float b, float c, float d);
 float3 make_float3(float3 a, float w);
+
 float3 operator*(const float3& a, float b);
+float3 operator-(const float3& a, float b); 
+
 float3 operator*(const float3& a, const float3& b);
 float3 operator+(const float3& a, const float3& b);
 float3 operator-(const float3& a, const float3& b);
+
+float3 operator*=(float3& a, float b);
+float3 operator+=(float3& a, const float3& b);
+
 float3 cross(const float3& a, const float3& b);
 float dot(const float3& a, const float3& b);
 float3 normalize(const float3 a);
@@ -44,6 +51,9 @@ struct ALIGN(16) mat4 {
   static mat4 Translate(const float x, const float y, const float z);
   static mat4 Translate( const float3& p);
   static mat4 RotateY(float a);
+  static mat4 RotateX(float a);
+  static mat4 RotateZ(float a);
+  static mat4 Scale(float a);
 
   mat4 Inverted() const; 
 };

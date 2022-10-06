@@ -1,4 +1,5 @@
 // https://jacco.ompf2.com/2022/04/13/how-to-build-a-bvh-part-1-basics/
+#include "bvh_instance.h"
 #include "vec_math.h"
 #include "random.h"
 #include "PPMImage.h"
@@ -8,6 +9,7 @@
 #include "ray.h"
 #include "tlas.h"
 #include "config.h"
+#include "util.h"
 
 #include <algorithm>
 #include <cmath>
@@ -21,43 +23,50 @@
 #include <raylib.h>
 #include <rlgl.h>
 
-extern bvt::BVH bvh[2];
+#define INSTANCE_COUNT 128
+extern BVHInstance bvhInstance[INSTANCE_COUNT];
 extern TLAS tlas;
 
+float3 *position, *direction, *orientation;
 
-/* void Animate() { */
-/*   static float r = 0; */
-/*   if((r+=0.05f) > 2 * PI) r -= 2 * PI; */
-/*  */
-/*   float a = sinf(r) * 0.5f; */
-/*   for (int i = 0; i < N; i++) for (int j = 0; j < 3; j++) { */
-/*  */
-/*     // So you can access vertex0, vertex1, and vertex2 */
-/*     // with iteration instead of having to write them manually */
-/*     float3 o = (&original[i].vertex0)[j]; */
-/*  */
-/*     // Makes the rotation angle scale with the y axis position (height) */
-/*     // of the vertex so the base doesn't move but the edges move significantly. */
-/*     float s = a * (o.y - 0.2f) * 0.2f; */
-/*  */
-/*     // Rotating about the z axis? */
-/*     float x = o.x * cosf( s ) - o.y * sinf( s ); */
-/*     float y = o.x * sinf( s ) + o.y * cosf( s ); */
-/*  */
-/*     (&tri[i].vertex0)[j] = make_float3(x,y,o.z); */
-/*   } */
-/* } */
+void Animate() {
+  for (int i = 0 ; i < INSTANCE_COUNT; i++) {
+    mat4 R = mat4::RotateX(orientation[i].x) 
+      * mat4::RotateY(orientation[i].y)
+      * mat4::RotateZ(orientation[i].z)
+      * mat4::Scale(0.2f);
+
+    bvhInstance[i].SetTransform(mat4::Translate(position[i]) * R);
+    position[i] += direction[i], orientation[i] += direction[i];;
+
+    if(position[i].x < -3 || position[i].x > 3) direction[i].x *= -1;
+    if(position[i].y < -3 || position[i].y > 3) direction[i].y *= -1;
+    if(position[i].z < -3 || position[i].z > 3) direction[i].z *= -1;
+  }
+}
 
 int main() {
 
   bvt::Image output = bvt::Image::fromColor(RES_X, RES_Y, make_float3(0));
+  bvt::BVH* bvh = new bvt::BVH("assets/armadillo.tri", 30000);
 
-  float3 p0{-1, 1, 2}, p1{1, 1, 2}, p2{-1, -1, 2};
-  bvh[0] = bvt::BVH("assets/bigben.tri", 20944);
-  bvh[1] = bvt::BVH("assets/bigben.tri", 20944);
+  for (int i = 0; i < INSTANCE_COUNT; i++) {
+    bvhInstance[i] = BVHInstance(bvh);
+  }
 
-  tlas = TLAS(bvh, 2);
-  tlas.Build();
+  tlas = TLAS(bvhInstance, INSTANCE_COUNT);
+  position = new float3[INSTANCE_COUNT];
+  direction = new float3[INSTANCE_COUNT];
+  orientation = new float3[INSTANCE_COUNT];
+
+  for (int i = 0 ; i < INSTANCE_COUNT; i++) {
+    position[i] = make_float3(RandomFloat(), RandomFloat(), RandomFloat()) - 0.5f;
+    position[i] *= 4;
+
+    direction[i] = normalize(position[i]) * 0.05f;
+    orientation[i] = make_float3(RandomFloat(), RandomFloat(), RandomFloat()) * 2.5f;
+  }
+
 
   InitWindow(RES_X, RES_Y, "BVH Tracer");
 
@@ -72,21 +81,46 @@ int main() {
 
   const int tile_size = 8;
 
+  float3 posOffset;
+  float angleX = 0.0f, angleY = 0;
+
   while(!WindowShouldClose()) {
-    static float angle = 0;
-    angle += 0.01f; if (angle > 2 * PI) angle -= 2 * PI;
 
-    bvh[0].SetTranform(mat4::Translate(-1.3f, 0, 0));
-    bvh[1].SetTranform(mat4::Translate(1.3f, 0, 0) * mat4::RotateY(angle));
+    Animate();
+    tlas.Build();
 
-#pragma parallel for schedule(dynamic)
+    if(IsKeyDown(KEY_D)) posOffset.x += 0.1f;
+    if(IsKeyDown(KEY_A)) posOffset.x -= 0.1f;
+    
+    if(IsKeyDown(KEY_W)) posOffset.z += 0.1f;
+    if(IsKeyDown(KEY_S)) posOffset.z -= 0.1f;
+    
+    if(IsKeyDown(KEY_E)) posOffset.y += 0.1f;
+    if(IsKeyDown(KEY_Q)) posOffset.y -= 0.1f;
+
+    if(IsKeyDown(KEY_UP)) angleX += 0.1f;
+    if(IsKeyDown(KEY_DOWN)) angleX -= 0.1f;
+
+    if(IsKeyDown(KEY_LEFT)) angleY += 0.1f;
+    if(IsKeyDown(KEY_RIGHT)) angleY -= 0.1f;
+
+
+    float3 p0 = TransformPosition(make_float3(-1,+1,2), mat4::RotateX(angleX) * mat4::RotateY(angleY));
+    float3 p1 = TransformPosition(make_float3(+1,+1,2), mat4::RotateX(angleX) * mat4::RotateY(angleY));
+    float3 p2 = TransformPosition(make_float3(-1,-1,2), mat4::RotateX(angleX) * mat4::RotateY(angleY));
+
+    /* printf("Ray origin: (%f, %f, %f)\n", ray.O.x, ray.O.y, ray.O.z); */
+    /* printf("Angle X: %f, Angle Y: %f\n", angleX, angleY); */
+
 
     auto start = std::chrono::high_resolution_clock::now();
-    for (int tile = 0; tile < 6400; tile++) {
+#pragma omp parallel for schedule(dynamic)
+    for (int tile = 0; tile < (RES_X * RES_Y) / 64; tile++) {
 
-      int x = tile % 80, y = tile / 80;
+      int x = tile % (RES_X / 8), y = tile / (RES_X / 8);
+
       bvt::Ray ray;
-      ray.O = make_float3(1, 3.5f, -4.5f);
+      ray.O = make_float3(0,0, -6.5) + posOffset;
 
       for (int v = 0; v < tile_size ; v++ ) for (int u = 0; u < tile_size; u++) {
 
@@ -103,14 +137,18 @@ int main() {
            p0, p1, p2.
            */
 
-        float3 pixelPos = ray.O + p0 + (p1-p0) * ((x * 8 +u)/RES_X) + (p2-p0) * ((y * 8+v)/RES_Y);
+        float3 pixelPos = ray.O + p0 
+          + (p1-p0) * ((x * 8 + u)/(float)RES_X) 
+          + (p2-p0) * ((y * 8 + v)/(float)RES_Y);
+
         ray.D = normalize(pixelPos - ray.O);
-        ray.rD = make_float3(1/ray.D.x , 1/ray.D.y, 1/ray.D.z); 
         ray.t = 1e30f;
+
+        ray.rD = make_float3(1/ray.D.x , 1/ray.D.y, 1/ray.D.z); 
 
         tlas.Intersect(ray);
 
-        uint c = (255 - (int)((ray.t - 4) * 180));
+        uint c = ray.t < 1e30f ? (int)(255 / (1 + std::max( 0.f, ray.t - 4 ))) : 0;
 
         if(ray.t < 1e30f) {
           output.writeToPixel(x * 8 + u, y * 8 + v, make_float3(c));      

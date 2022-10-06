@@ -16,6 +16,11 @@ CMAKE_POLICY(SET CMP0074 NEW)
 set(SOURCES 
   src/main.cpp
   src/bvh.cpp
+  src/bvh_instance.cpp
+  src/tlas.cpp
+
+  src/vec_math.cpp
+  src/util.cpp
 )
 
 # Define the directories in which to search for the included headers
@@ -46,4 +51,5 @@ target_link_libraries(
   -lrt 
   -lX11 
   -ldl
+  -msse2
 )

@@ -1,5 +1,7 @@
 #include "config.h"
 #include "bvh.h"
+#include <cstdio>
+#include <memory.h>
 
 #define VMUL(a,b) _mm_mul_ps(a,b)
 #define VSUB(a,b) _mm_sub_ps(a,b)
