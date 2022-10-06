@@ -81,7 +81,7 @@ int main() {
 
   const int tile_size = 8;
 
-  float3 posOffset;
+  float3 posOffset = {0};
   float angleX = 0.0f, angleY = 0;
 
   while(!WindowShouldClose()) {
